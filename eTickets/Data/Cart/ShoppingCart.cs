@@ -17,6 +17,17 @@ namespace eTickets.Data.Cart
             _context = context;
         }
 
+        public static ShoppingCart GetShoppingCart(IServiceProvider serviceProvider)
+        {
+            ISession session = serviceProvider.GetRequiredService<IHttpContextAccessor>()?.HttpContext.Session;
+            var context = serviceProvider.GetService<AppDbContext>();
+
+            string cartId = session.GetString("CartId") ?? Guid.NewGuid().ToString();
+            session.SetString("CartId", cartId);
+
+            return new ShoppingCart(context) { ShoppingCartId = cartId };
+        }
+
         public void AddItemToCart(Movie movie)
         {
             var shoppingCartItem = _context.ShoppingCardItems.FirstOrDefault(n => n.Movie.Id == movie.Id && n.ShoppingCartId == ShoppingCartId);
@@ -58,14 +69,26 @@ namespace eTickets.Data.Cart
         }
 
         public List<ShoppingCardItem> GetShoppingCardItems()
-            {
-                return ShoppingCardItems ?? (ShoppingCardItems = _context.ShoppingCardItems.Where(n => n.ShoppingCartId == ShoppingCartId).Include(n => n.Movie).ToList());
-            }
-
-            public double GetShoppingCartTotal()
-            {
-                var total = _context.ShoppingCardItems.Where(n => n.ShoppingCartId == ShoppingCartId).Select(n => n.Movie.Price * n.Amount).Sum();
-                return total;
-            }
+        {
+            return ShoppingCardItems ?? (ShoppingCardItems = _context.ShoppingCardItems.Where(n => n.ShoppingCartId == ShoppingCartId).Include(n => n.Movie).ToList());
         }
-    } 
+
+        public async Task ClearShoppingCartAsync()
+        {
+            var items = await _context.ShoppingCardItems.Where(n => n.ShoppingCartId == ShoppingCartId).ToListAsync();
+            _context.ShoppingCardItems.RemoveRange(items);
+            await _context.SaveChangesAsync();
+
+        }
+
+
+        public double GetShoppingCartTotal()
+        {
+            var total = _context.ShoppingCardItems.Where(n => n.ShoppingCartId == ShoppingCartId).Select(n => n.Movie.Price * n.Amount).Sum();
+            return total;
+        }
+
+        
+
+    }
+}
